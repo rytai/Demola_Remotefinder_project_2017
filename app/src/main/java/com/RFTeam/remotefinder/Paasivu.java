@@ -1,5 +1,6 @@
 package com.RFTeam.remotefinder;
 
+import android.app.ActionBar;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.bluetooth.BluetoothAdapter;
@@ -12,7 +13,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
@@ -87,8 +90,19 @@ public class Paasivu extends Activity {
         }
     };
 
+    Runnable posUpdate = new Runnable() {
+        @Override
+        public void run() {
+            ImageView remote = (ImageView) findViewById(R.id.remote);
+            ImageView user = (ImageView) findViewById(R.id.user);
+            remote.setX(user.getX());
+            remote.setY(user.getY());
+        }
+    };
+
     void startRepeatingTask(){
         btUpdate.run();
+        posUpdate.run();
     }
 
     void stopRepeatingTask(){
