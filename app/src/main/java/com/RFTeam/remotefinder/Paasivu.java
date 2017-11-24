@@ -35,15 +35,16 @@ public class Paasivu extends Activity {
 
         registerReceiver(receiver, new IntentFilter(BluetoothDevice.ACTION_FOUND));
 
-        Button but = (Button) findViewById(R.id.button1);
+        /*Button but = (Button) findViewById(R.id.signalLabel);
         but.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 BTAdapter.startDiscovery();
             }
         });
+        **/
 
-        TextView rssi_msg = (TextView) findViewById(R.id.teksti1);
+        TextView rssi_msg = (TextView) findViewById(R.id.signalLabel);
         if (BTAdapter == null){
             rssi_msg.setText("Device doesn't support bluetooth\n");
         }else{
@@ -68,7 +69,7 @@ public class Paasivu extends Activity {
                 btDeviceList.add(new_device);
                 int rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE);
                 String name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME);
-                TextView rssi_msg = (TextView) findViewById(R.id.teksti1);
+                TextView rssi_msg = (TextView) findViewById(R.id.signalLabel);
                 String str_ = rssi_msg.getText() + name + " => " +rssi + "dBm\n";
                 rssi_msg.setText(str_);
             }
