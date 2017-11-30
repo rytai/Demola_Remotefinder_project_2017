@@ -1,8 +1,6 @@
 package com.RFTeam.remotefinder;
 
-import android.app.ActionBar;
 import android.app.Activity;
-import android.app.ActivityManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
@@ -11,22 +9,24 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.ImageView;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
-import java.util.Iterator;
-
-import javax.net.ssl.HandshakeCompletedEvent;
+import java.util.Set;
 
 public class Paasivu extends Activity {
 
     private BluetoothAdapter BTAdapter = BluetoothAdapter.getDefaultAdapter();
     ArrayList<BluetoothDevice> btDeviceList = new ArrayList<BluetoothDevice>();
+
+    ListView deviceList;
+    TextView selectedDeviceLabel;
+    private Set<BluetoothDevice> pairedDevices;
+    BluetoothDevice selectedDevice;
 
     private int paivitysTaajuus = 1000;
     private Handler btHandler;
@@ -37,6 +37,11 @@ public class Paasivu extends Activity {
         setContentView(R.layout.activity_paasivu);
 
         registerReceiver(receiver, new IntentFilter(BluetoothDevice.ACTION_FOUND));
+
+        deviceList = findViewById(R.id.deviceList);
+        selectedDeviceLabel = findViewById(R.id.selectedDeviceLabel);
+
+        list();
 
         /*Button but = (Button) findViewById(R.id.signalLabel);
         but.setOnClickListener(new View.OnClickListener() {
@@ -73,7 +78,7 @@ public class Paasivu extends Activity {
                 int rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE);
                 String name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME);
                 TextView rssi_msg = (TextView) findViewById(R.id.signalLabel);
-                String str_ = rssi_msg.getText() + name + " => " +rssi + "dBm\n";
+                String str_ = rssi_msg.getText() + name + " => " + rssi + "dBm\n";
                 rssi_msg.setText(str_);
             }
         }
@@ -90,19 +95,32 @@ public class Paasivu extends Activity {
         }
     };
 
-    Runnable posUpdate = new Runnable() {
-        @Override
-        public void run() {
-            ImageView remote = (ImageView) findViewById(R.id.remote);
-            ImageView user = (ImageView) findViewById(R.id.user);
-            remote.setX(user.getX());
-            remote.setY(user.getY());
+    public void list() {
+        pairedDevices = BTAdapter.getBondedDevices();
+        ArrayList<String> list = new ArrayList<String>();
+        for (BluetoothDevice bt : pairedDevices)
+        {
+            list.add(bt.getName());
         }
-    };
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, list);
+        deviceList.setAdapter(adapter);
+        deviceList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                String info = ((TextView) view).getText().toString();
+                for (BluetoothDevice bt : pairedDevices) {
+                    if (bt.getName().equals(info)) {
+                        selectedDevice = bt;
+                        selectedDeviceLabel.setText(selectedDevice.getName());
+                    }
+                }
+
+            }
+        });
+    }
 
     void startRepeatingTask(){
         btUpdate.run();
-        posUpdate.run();
     }
 
     void stopRepeatingTask(){
