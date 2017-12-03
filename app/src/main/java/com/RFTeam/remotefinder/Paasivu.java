@@ -19,15 +19,231 @@ import android.view.View;
 import android.view.ViewDebug;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 public class Paasivu extends Activity {
 
-    //private?
+    // ############# Bluetooth ##############
+    //Instance in used for Bluetooth low-energy connectivity
+    //We want only one concurrent gatt-connection at a time.
+    BluetoothGatt gatt;
+
+    //Needed for bluetooth device discovery.
+    private BluetoothAdapter btAdapter;
+
+    //List of all discovered devices. (Devices in range)
+    ArrayList<BluetoothDevice> btDeviceList = new ArrayList<BluetoothDevice>();
+
+    //Used in the gui to report signal strength
+    String gui_rssi_reading = "";
+
+    BluetoothDevice selectedDevice;
+    String selectedDeviceAddress;
+
+    private int btDevicePollFrequency = 1000;
+    private Handler btDeviceDiscoveryHandler;
+
+    //############# RSSI ##############
+    private Handler RSSIReadingHandler;
+
+    // ############# GUI ##############
+    //Gets populated by bluetoothdevices
+    ListView deviceListView;
+    //Devices name goes in here
+    TextView selectedDeviceLabel;
+
+    private Handler UIUpdateHandler;
+
+    //#################################
+    int program_state;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_paasivu);
+
+        //receiver gets responses from bluetooth device discovery
+        registerReceiver(receiver, new IntentFilter(BluetoothDevice.ACTION_FOUND));
+
+        deviceListView = findViewById(R.id.deviceList);
+        selectedDeviceLabel = findViewById(R.id.selectedDeviceLabel);
+
+        //Textview at bottom of screen for debugigng purposes
+        TextView rssi_msg = (TextView) findViewById(R.id.signalLabel);
+
+        btDeviceDiscoveryHandler = new Handler();
+        RSSIReadingHandler = new Handler();
+        UIUpdateHandler = new Handler();
+
+        //Initiate btAdapter.
+        btAdapter = BluetoothAdapter.getDefaultAdapter();
+        //Check if we have bluetooth connectivity
+        program_state = STATE.NO_BLUETOOTH; //Initially no connection
+        // TODO: Update this on on activity reload also. Currently needs restarting the app.
+        if (btAdapter == null){
+            rssi_msg.setText("Device doesn't support bluetooth\n");
+
+        }else{
+            if (!btAdapter.isEnabled()){
+                rssi_msg.setText("Bluetooth not enabled\n");
+            }else{
+                rssi_msg.setText("Bluetooth enabled\n");
+                startBluetoothDeviceDiscovery();
+            }
+        }
+
+        initiateDeviceListview();
+
+        //UI update runs through the lifetime of the app.
+        startUIUpdate();
+
+    }
+
+
+    //############### Bluetooth Device discovery ##################
+
+    Runnable btDiscoveryUpdate = new Runnable() {
+        @Override
+        public void run() {
+            try{
+                Log.d("testi", "Starting bluetooth discovery");
+                btAdapter.startDiscovery();
+            }finally {
+                //After 4 seconds call update again.
+                btDeviceDiscoveryHandler.postDelayed(btDiscoveryUpdate, 4000);
+            }
+        }
+    };
+
+    void startBluetoothDeviceDiscovery(){
+        program_state = STATE.BLUETOOTH_DISCOVERING;
+        btDiscoveryUpdate.run();
+    }
+
+    //Remember to change the program state!
+    void stopBluetoothDeviceDiscovery(){
+        program_state = STATE.UNDEFINED;
+        btDeviceDiscoveryHandler.removeCallbacks(btDiscoveryUpdate);
+    }
+    //Listens on responses from bluetooth device discovery
+    private final BroadcastReceiver receiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            //Device found.
+            if(BluetoothDevice.ACTION_FOUND.equals(action)){
+                Log.d("testi", "Broadcastreceiver: new device found.");
+                BluetoothDevice new_device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+
+                //Add the device to our list of devices if it doesn't exist there.
+                if (!btDeviceList.contains(new_device)) {
+                    btDeviceList.add(new_device);
+                }
+
+                // Old way of getting rssi reading from device discovery
+                // Left here for debugging purposes. Shows up on bottom of screen.
+
+                //Get initial rssi reading
+                int rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE);
+                String name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME);
+                TextView rssi_msg = (TextView) findViewById(R.id.signalLabel);
+                String str_ = rssi_msg.getText() + name + " => " + rssi + "dBm\n";
+                rssi_msg.setText(str_);
+
+                // Updte device list on screen.
+                updateDeviceListview();
+            }
+        }
+    };
+
+    //###################### RSSI reading ########################
+
+    Runnable RSSIReadingUpdate = new Runnable() {
+        @Override
+        public void run() {
+            try{
+                //List<BluetoothDevice> list_ = gatt.getConnectedDevices();
+                //if (list_.contains(selectedDevice)) {
+                gatt.readRemoteRssi();
+                //}else{
+                //    Log.d("testi", "!!!Trying to read rssi of not connected device");
+                //}
+            }finally {
+                //After 1 seconds call update again.
+                btDeviceDiscoveryHandler.postDelayed(RSSIReadingUpdate, 1000);
+            }
+        }
+    };
+
+    void startRSSIReading(){
+        program_state = STATE.READING_RSSI;
+        RSSIReadingUpdate.run();
+    }
+
+    void stopRSSIReading(){
+        program_state = STATE.UNDEFINED;
+        RSSIReadingHandler.removeCallbacks(RSSIReadingUpdate);
+    }
+
+
+
+    // ############## DEVICE LIST & INTERACTION ############################
+
+    public void initiateDeviceListview() {
+        ArrayList<String> list = new ArrayList<String>();
+        for (BluetoothDevice bt : btDeviceList) {
+            list.add(bt.getName());
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, list);
+        deviceListView.setAdapter(adapter);
+        deviceListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                String info = ((TextView) view).getText().toString();
+                for (BluetoothDevice bt : btDeviceList){//pairedDevices) {
+                    if (bt.getName().equals(info)) {
+                        Select_Device(bt);
+                    }
+                }
+
+            }
+        });
+    }
+    public void updateDeviceListview() {
+        ArrayList<String> list = new ArrayList<String>();
+        for (BluetoothDevice bt : btDeviceList)//pairedDevices)
+        {
+            list.add(bt.getName());
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, list);
+        deviceListView.setAdapter(adapter);
+    }
+
+    public void Select_Device(BluetoothDevice btDevice_){
+        stopBluetoothDeviceDiscovery();
+        program_state = STATE.DEVICE_SELECTED;
+
+        selectedDevice = btDevice_;
+        selectedDeviceAddress = btDevice_.getAddress();
+
+        String name_ = btDevice_.getName();
+        selectedDeviceLabel.setText(name_);
+
+        //Connect gatt to this device
+        if (connect(btDevice_.getAddress())){
+            startRSSIReading();
+        }
+    }
+
+    //####################### GATT #######################
+
+
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
@@ -42,14 +258,13 @@ public class Paasivu extends Activity {
                 Log.d("testi", "onConChange: What is this state? :"+newState);
             }
         }
-
+        @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
             } else {
                 Log.w("testi", "onServicesDiscovered received: " + status);
             }
         }
-
         @Override
         public void onCharacteristicRead(BluetoothGatt gatt,
                                          BluetoothGattCharacteristic characteristic,
@@ -57,164 +272,22 @@ public class Paasivu extends Activity {
             Log.d("testi", "onCharacteristicRead"+characteristic.toString());
             Log.d("testi", "onCharacteristicReadstatus"+status);
         }
-
         @Override
         public void onCharacteristicChanged(BluetoothGatt gatt,
                                             BluetoothGattCharacteristic characteristic) {
 
             Log.d("testi", "onCharacteristicChanged"+characteristic.toString());
-        }
-        @Override
+        }        @Override
         public void onReadRemoteRssi(BluetoothGatt gatt_, int arvo1, int arvo2){
             Log.d("testi", "rssi "+ arvo1 + " arvo2 "+arvo2);
             String text_ = selectedDevice.getName() + " Rssi: "+arvo1+" dBm";
-            rssi_reading = " " +arvo1;
+            gui_rssi_reading = " " +arvo1;
         }
         /*@Override
         public void onClientRegistered (BluetoothGatt gatt_, int arvo1, int arvo2){
             Log.d("testi", "rssi "+ arvo1 + " arvo2 "+arvo2);
         }*/
     };
-
-
-    BluetoothGatt gatt;
-
-    //Needed for probing for devices.
-    private BluetoothAdapter BTAdapter = BluetoothAdapter.getDefaultAdapter();
-    //List of all devices in range.
-    ArrayList<BluetoothDevice> btDeviceList = new ArrayList<BluetoothDevice>();
-    //Filtered devices. (By name)
-    ArrayList<BluetoothDevice> beaconList = new ArrayList<BluetoothDevice>();
-
-    ListView deviceList;
-    String rssi_reading = "";
-    TextView selectedDeviceLabel;
-    private Set<BluetoothDevice> pairedDevices;
-    BluetoothDevice selectedDevice;
-    String selectedDeviceAddress;
-
-    private int btDevicePollFrequency = 1000;
-    private Handler btHandler;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_paasivu);
-
-        //For when we get response from pollind btDevices
-        registerReceiver(receiver, new IntentFilter(BluetoothDevice.ACTION_FOUND));
-
-        deviceList = findViewById(R.id.deviceList);
-        selectedDeviceLabel = findViewById(R.id.selectedDeviceLabel);
-
-
-        /*Button but = (Button) findViewById(R.id.signalLabel);
-        but.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                BTAdapter.startDiscovery();
-            }
-        });
-        **/
-
-        TextView rssi_msg = (TextView) findViewById(R.id.signalLabel);
-        if (BTAdapter == null){
-            rssi_msg.setText("Device doesn't support bluetooth\n");
-        }else{
-            if (!BTAdapter.isEnabled()){
-                rssi_msg.setText("Bluetooth not enabled\n");
-            }else{
-                rssi_msg.setText("Bluetooth enabled\n");
-            }
-        }
-
-        btHandler = new Handler();
-
-        startRepeatingTask();
-        list();
-
-    }
-
-    private final BroadcastReceiver receiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if(BluetoothDevice.ACTION_FOUND.equals(action)){
-                Log.d("testi", "Broadcastreceiver: new device found.");
-                BluetoothDevice new_device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                //Add the device if it's a new one
-                if (!btDeviceList.contains(new_device)) {
-                    btDeviceList.add(new_device);
-                }
-                int rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE);
-                String name = intent.getStringExtra(BluetoothDevice.EXTRA_NAME);
-                TextView rssi_msg = (TextView) findViewById(R.id.signalLabel);
-                String str_ = rssi_msg.getText() + name + " => " + rssi + "dBm\n";
-                rssi_msg.setText(str_);
-                //connect(new_device.getAddress());
-                list();
-            }
-        }
-    };
-
-
-    Runnable btUpdate = new Runnable() {
-        @Override
-        public void run() {
-            Log.d("testi", "btupdate:");
-            try{
-                if(gatt != null && selectedDevice != null){
-                    Log.d("testi", "btupdate: send readremoterssi");
-                    gatt.readRemoteRssi();
-                }else {
-                    Log.d("testi", "btupdate: startdiscovery");
-                    BTAdapter.startDiscovery();
-                }
-                if(selectedDevice != null) {
-                    String str_ = selectedDevice.getName()+" signal strenght:" + rssi_reading+"dBm";
-                    selectedDeviceLabel.setText(str_);
-                }
-            }finally {
-                Log.d("testi", "btupdate:postnew");
-                btHandler.postDelayed(btUpdate, btDevicePollFrequency);
-            }
-        }
-    };
-
-    public void list() {
-        //pairedDevices = BTAdapter.getBondedDevices();
-        ArrayList<String> list = new ArrayList<String>();
-        for (BluetoothDevice bt : btDeviceList)//pairedDevices)
-        {
-            list.add(bt.getName());
-        }
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, list);
-        deviceList.setAdapter(adapter);
-        deviceList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                String info = ((TextView) view).getText().toString();
-                for (BluetoothDevice bt : btDeviceList){//pairedDevices) {
-                    if (bt.getName().equals(info)) {
-                        selectedDevice = bt;
-                        String name_ = selectedDevice.getName();
-                        selectedDeviceAddress = selectedDevice.getAddress();
-                        selectedDeviceLabel.setText(name_);
-                        connect(bt.getAddress());
-                    }
-                }
-
-            }
-        });
-    }
-
-    void startRepeatingTask(){
-        btUpdate.run();
-    }
-
-    void stopRepeatingTask(){
-        btHandler.removeCallbacks(btUpdate);
-    }
 
 
     /**
@@ -228,26 +301,31 @@ public class Paasivu extends Activity {
      *         callback.
      */
     public boolean connect(final String address) {
-        if (BTAdapter == null || address == null) {
+        program_state = STATE.GATT_CONNECTING;
+
+        //Check that we have bluetooth and address field is not null.
+        if (btAdapter == null || address == null) {
             Log.w("testi", "BluetoothAdapter not initialized or unspecified address.");
             return false;
         }
 
-        // Previously connected device.  Try to reconnect.
+        // Try to reconnect gatt if we're connecting to same device as last time.
         if (selectedDeviceAddress != null && address.equals(selectedDeviceAddress)
                 && gatt != null) {
             Log.d("testi", "Trying to use an existing mBluetoothGatt for connection.");
             if (gatt.connect()) {
-                Log.d("testi", "connecting. with previous gatt");
-                //mConnectionState = STATE_CONNECTING;
+                Log.d("testi", "Connected to device with previously existing GATT");
+                program_state = STATE.GATT_CONNECTED;
                 return true;
             } else {
                 Log.d("testi", "couldn't connect with existing gatt");
+                program_state = STATE.CURRENT_DEVICE_DISCONNECTED;
                 return false;
             }
         }
 
-        final BluetoothDevice device = BTAdapter.getRemoteDevice(address);
+        // There is no previous connection -> Create a new one.
+        final BluetoothDevice device = btAdapter.getRemoteDevice(address);
         if (device == null) {
             Log.w("testi", "Device not found.  Unable to connect.");
             return false;
@@ -255,11 +333,40 @@ public class Paasivu extends Activity {
         // We want to directly connect to the device, so we are setting the autoConnect
         // parameter to false.
         gatt = device.connectGatt(this, false, mGattCallback);
+        program_state = STATE.GATT_CONNECTED;
 
         Log.d("testi", "connecting. with new gatt");
         //mConnectionState = STATE_CONNECTING;
         return true;
     }
 
+    //####################### UI #######################
+
+
+    Runnable UIUpdate = new Runnable() {
+        @Override
+        public void run() {
+            try{
+                if (program_state == STATE.READING_RSSI) {
+                    String str_ = selectedDevice.getName() +" "+gui_rssi_reading;
+                            selectedDeviceLabel.setText(str_);
+                }else if(program_state == STATE.BLUETOOTH_DISCOVERING){
+                    selectedDeviceLabel.setText("Discovering bluetooth devices");
+                }
+            }finally {
+                //After 1 seconds call update again.
+                btDeviceDiscoveryHandler.postDelayed(UIUpdate, 1000);
+            }
+        }
+    };
+
+    void startUIUpdate(){
+        UIUpdate.run();
+    }
+
+    //Obsolete
+    void stopUIUpdate(){
+        UIUpdateHandler.removeCallbacks(UIUpdate);
+    }
 
 }
