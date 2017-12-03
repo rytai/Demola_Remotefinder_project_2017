@@ -33,6 +33,7 @@ public class Paasivu extends Activity {
     //Instance in used for Bluetooth low-energy connectivity
     //We want only one concurrent gatt-connection at a time.
     BluetoothGatt gatt;
+    String gatt_connecting_to_device = "";
 
     //Needed for bluetooth device discovery.
     private BluetoothAdapter btAdapter;
@@ -236,9 +237,7 @@ public class Paasivu extends Activity {
         selectedDeviceLabel.setText(name_);
 
         //Connect gatt to this device
-        if (connect(btDevice_.getAddress())){
-            startRSSIReading();
-        }
+        connect(btDevice_.getAddress());
     }
 
     //####################### GATT #######################
@@ -246,14 +245,23 @@ public class Paasivu extends Activity {
 
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
-        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+        public void onConnectionStateChange(BluetoothGatt gatt_, int status, int newState) {
             String intentAction;
             Log.d("testi", "onConnectionStateChange:"+newState+ "status "+status);
             if (newState == BluetoothProfile.STATE_CONNECTED){
                 Log.d("testi", "onConChange: Connected!");
-                gatt.discoverServices();
+                program_state = STATE.GATT_CONNECTED;
+                startRSSIReading();
+                gatt_.discoverServices();
+
             }else if(newState == BluetoothProfile.STATE_DISCONNECTED){
                 Log.d("testi", "onConChange: State disconnected");
+
+                //Connection failed. Try to reconnect.
+                if (program_state == STATE.GATT_CONNECTING || program_state == STATE.CONNECTION_FAILED_RECONNECTING){
+                    program_state = STATE.CONNECTION_FAILED_RECONNECTING;
+                    connect(gatt_connecting_to_device);
+                }
             }else{
                 Log.d("testi", "onConChange: What is this state? :"+newState);
             }
@@ -264,6 +272,7 @@ public class Paasivu extends Activity {
             } else {
                 Log.w("testi", "onServicesDiscovered received: " + status);
             }
+            Log.d("testi", "Services discovered.");
         }
         @Override
         public void onCharacteristicRead(BluetoothGatt gatt,
@@ -302,6 +311,7 @@ public class Paasivu extends Activity {
      */
     public boolean connect(final String address) {
         program_state = STATE.GATT_CONNECTING;
+        gatt_connecting_to_device = address;
 
         //Check that we have bluetooth and address field is not null.
         if (btAdapter == null || address == null) {
@@ -333,7 +343,7 @@ public class Paasivu extends Activity {
         // We want to directly connect to the device, so we are setting the autoConnect
         // parameter to false.
         gatt = device.connectGatt(this, false, mGattCallback);
-        program_state = STATE.GATT_CONNECTED;
+        program_state = STATE.GATT_CONNECTING;
 
         Log.d("testi", "connecting. with new gatt");
         //mConnectionState = STATE_CONNECTING;
@@ -352,7 +362,14 @@ public class Paasivu extends Activity {
                             selectedDeviceLabel.setText(str_);
                 }else if(program_state == STATE.BLUETOOTH_DISCOVERING){
                     selectedDeviceLabel.setText("Discovering bluetooth devices");
+                }else if(program_state == STATE.GATT_CONNECTING){
+                    selectedDeviceLabel.setText("Connecting to device.");
+                }else if(program_state == STATE.CONNECTION_FAILED_RECONNECTING){
+                    selectedDeviceLabel.setText("Connection failed. Retrying.");
                 }
+
+
+
             }finally {
                 //After 1 seconds call update again.
                 btDeviceDiscoveryHandler.postDelayed(UIUpdate, 1000);

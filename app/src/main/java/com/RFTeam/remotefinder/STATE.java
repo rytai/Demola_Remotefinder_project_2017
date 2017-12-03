@@ -14,5 +14,6 @@ public final class STATE {
     public static int READING_RSSI = 5;
     public static int CURRENT_DEVICE_DISCONNECTED = 6;
     public static int DEVICE_SELECTED = 7;
+    public static int CONNECTION_FAILED_RECONNECTING = 8;
     public static int UNDEFINED = 100;
 }
