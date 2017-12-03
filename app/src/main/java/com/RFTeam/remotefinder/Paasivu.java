@@ -23,8 +23,13 @@ import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 
 public class Paasivu extends Activity {
@@ -61,6 +66,10 @@ public class Paasivu extends Activity {
 
     private Handler UIUpdateHandler;
 
+    int rssi_readings_iterator = 0;
+    final int rssi_readings_count = 20;
+    int lastRSSI_Readings[] = new int[rssi_readings_count];
+
     //#################################
     int program_state;
 
@@ -95,11 +104,13 @@ public class Paasivu extends Activity {
                 rssi_msg.setText("Bluetooth not enabled\n");
             }else{
                 rssi_msg.setText("Bluetooth enabled\n");
-                startBluetoothDeviceDiscovery();
+                //startBluetoothDeviceDiscovery();
+                btAdapter.startDiscovery();
             }
         }
 
         initiateDeviceListview();
+
 
         //UI update runs through the lifetime of the app.
         startUIUpdate();
@@ -117,7 +128,7 @@ public class Paasivu extends Activity {
                 btAdapter.startDiscovery();
             }finally {
                 //After 4 seconds call update again.
-                btDeviceDiscoveryHandler.postDelayed(btDiscoveryUpdate, 4000);
+                btDeviceDiscoveryHandler.postDelayed(btDiscoveryUpdate, 10000);
             }
         }
     };
@@ -177,13 +188,14 @@ public class Paasivu extends Activity {
                 //}
             }finally {
                 //After 1 seconds call update again.
-                btDeviceDiscoveryHandler.postDelayed(RSSIReadingUpdate, 1000);
+                btDeviceDiscoveryHandler.postDelayed(RSSIReadingUpdate, 100);
             }
         }
     };
 
     void startRSSIReading(){
         program_state = STATE.READING_RSSI;
+        Log.d("testi", "Starting to rad rssi readings.");
         RSSIReadingUpdate.run();
     }
 
@@ -227,14 +239,13 @@ public class Paasivu extends Activity {
     }
 
     public void Select_Device(BluetoothDevice btDevice_){
-        stopBluetoothDeviceDiscovery();
+        //stopBluetoothDeviceDiscovery();
         program_state = STATE.DEVICE_SELECTED;
 
         selectedDevice = btDevice_;
         selectedDeviceAddress = btDevice_.getAddress();
 
         String name_ = btDevice_.getName();
-        selectedDeviceLabel.setText(name_);
 
         //Connect gatt to this device
         connect(btDevice_.getAddress());
@@ -258,10 +269,11 @@ public class Paasivu extends Activity {
                 Log.d("testi", "onConChange: State disconnected");
 
                 //Connection failed. Try to reconnect.
-                if (program_state == STATE.GATT_CONNECTING || program_state == STATE.CONNECTION_FAILED_RECONNECTING){
+                //if (program_state == STATE.GATT_CONNECTING | program_state == STATE.CONNECTION_FAILED_RECONNECTING){
                     program_state = STATE.CONNECTION_FAILED_RECONNECTING;
                     connect(gatt_connecting_to_device);
-                }
+                //}
+                connect(gatt_connecting_to_device);
             }else{
                 Log.d("testi", "onConChange: What is this state? :"+newState);
             }
@@ -288,9 +300,15 @@ public class Paasivu extends Activity {
             Log.d("testi", "onCharacteristicChanged"+characteristic.toString());
         }        @Override
         public void onReadRemoteRssi(BluetoothGatt gatt_, int arvo1, int arvo2){
-            Log.d("testi", "rssi "+ arvo1 + " arvo2 "+arvo2);
+            //Log.d("testi", "rssi "+ arvo1 + " arvo2 "+arvo2);
             String text_ = selectedDevice.getName() + " Rssi: "+arvo1+" dBm";
             gui_rssi_reading = " " +arvo1;
+            lastRSSI_Readings[rssi_readings_iterator] = arvo1;
+            if (rssi_readings_iterator == rssi_readings_count - 1){
+                rssi_readings_iterator = 0;
+            }else{
+                rssi_readings_iterator +=1;
+            }
         }
         /*@Override
         public void onClientRegistered (BluetoothGatt gatt_, int arvo1, int arvo2){
@@ -358,21 +376,34 @@ public class Paasivu extends Activity {
         public void run() {
             try{
                 if (program_state == STATE.READING_RSSI) {
-                    String str_ = selectedDevice.getName() +" "+gui_rssi_reading;
-                            selectedDeviceLabel.setText(str_);
+                    // TODO: Show averaged value instead of last one. work-on-progress:
+                    int sum = 0;
+                    for (int i = 0;  i < rssi_readings_count; i++){
+                        sum += lastRSSI_Readings[i];
+                    }
+                    float average = (float)sum / (float)rssi_readings_count;
+
+                    String str_ = "RSSI: "+selectedDevice.getName() +" "+gui_rssi_reading;
+                    str_ = str_ + "\nAverage: "+ average;
+                    selectedDeviceLabel.setText(str_);
+
                 }else if(program_state == STATE.BLUETOOTH_DISCOVERING){
                     selectedDeviceLabel.setText("Discovering bluetooth devices");
                 }else if(program_state == STATE.GATT_CONNECTING){
                     selectedDeviceLabel.setText("Connecting to device.");
                 }else if(program_state == STATE.CONNECTION_FAILED_RECONNECTING){
                     selectedDeviceLabel.setText("Connection failed. Retrying.");
+                }else if(program_state == STATE.CURRENT_DEVICE_DISCONNECTED){
+                    selectedDeviceLabel.setText("Disconnected");
+                }else if(program_state == STATE.DEVICE_SELECTED){
+                    selectedDeviceLabel.setText("Starting to connect.");
                 }
 
 
 
             }finally {
                 //After 1 seconds call update again.
-                btDeviceDiscoveryHandler.postDelayed(UIUpdate, 1000);
+                btDeviceDiscoveryHandler.postDelayed(UIUpdate, 100);
             }
         }
     };
