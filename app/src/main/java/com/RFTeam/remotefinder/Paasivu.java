@@ -55,7 +55,11 @@ public class Paasivu extends Activity {
     private int btDevicePollFrequency = 1000;
     private Handler btDeviceDiscoveryHandler;
 
+    //######## Gatt retrying when timeout occurs
+    private Handler GattConnectWithTimeoutHandler;
+
     //############# RSSI ##############
+    private String gattDeviceAddressToConnect;
     private Handler RSSIReadingHandler;
 
     // ############# GUI ##############
@@ -73,8 +77,20 @@ public class Paasivu extends Activity {
     //#################################
     int program_state;
 
+    // TODO: On resumeen samat
+
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onStop() {
+        stopRSSIReading();
+        stopUIUpdate();
+        super.onStop();
+        gatt.disconnect();
+        gatt.close();
+        btAdapter.cancelDiscovery();
+
+    }
+    @Override
+        protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_paasivu);
 
@@ -90,6 +106,7 @@ public class Paasivu extends Activity {
         btDeviceDiscoveryHandler = new Handler();
         RSSIReadingHandler = new Handler();
         UIUpdateHandler = new Handler();
+        GattConnectWithTimeoutHandler = new Handler();
 
         //Initiate btAdapter.
         btAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -247,8 +264,11 @@ public class Paasivu extends Activity {
 
         String name_ = btDevice_.getName();
 
+        gattDeviceAddressToConnect = btDevice_.getAddress();
+        startGattConnectingWithTimeout();
+
         //Connect gatt to this device
-        connect(btDevice_.getAddress());
+        //connect(btDevice_.getAddress());
     }
 
     //####################### GATT #######################
@@ -262,18 +282,20 @@ public class Paasivu extends Activity {
             if (newState == BluetoothProfile.STATE_CONNECTED){
                 Log.d("testi", "onConChange: Connected!");
                 program_state = STATE.GATT_CONNECTED;
+                stopGattConnectingWithTimeout();
                 startRSSIReading();
-                gatt_.discoverServices();
+                //gatt_.discoverServices(); this might(?) cause issues
 
             }else if(newState == BluetoothProfile.STATE_DISCONNECTED){
                 Log.d("testi", "onConChange: State disconnected");
 
                 //Connection failed. Try to reconnect.
-                //if (program_state == STATE.GATT_CONNECTING | program_state == STATE.CONNECTION_FAILED_RECONNECTING){
+                if (program_state == STATE.GATT_CONNECTING | program_state == STATE.CONNECTION_FAILED_RECONNECTING){
                     program_state = STATE.CONNECTION_FAILED_RECONNECTING;
-                    connect(gatt_connecting_to_device);
-                //}
-                connect(gatt_connecting_to_device);
+                    //startGattConnectingWithTimeout();
+                    //connect(gatt_connecting_to_device);
+                }
+                //connect(gatt_connecting_to_device);
             }else{
                 Log.d("testi", "onConChange: What is this state? :"+newState);
             }
@@ -340,8 +362,8 @@ public class Paasivu extends Activity {
         // Try to reconnect gatt if we're connecting to same device as last time.
         if (selectedDeviceAddress != null && address.equals(selectedDeviceAddress)
                 && gatt != null) {
-            Log.d("testi", "Trying to use an existing mBluetoothGatt for connection.");
-            if (gatt.connect()) {
+            Log.d("testi", "Gatt exists. Closing it and starting a new one.");
+            /*if (gatt.connect()) {
                 Log.d("testi", "Connected to device with previously existing GATT");
                 program_state = STATE.GATT_CONNECTED;
                 return true;
@@ -350,6 +372,9 @@ public class Paasivu extends Activity {
                 program_state = STATE.CURRENT_DEVICE_DISCONNECTED;
                 return false;
             }
+            */
+            gatt.disconnect();
+            gatt.close();
         }
 
         // There is no previous connection -> Create a new one.
@@ -366,6 +391,34 @@ public class Paasivu extends Activity {
         Log.d("testi", "connecting. with new gatt");
         //mConnectionState = STATE_CONNECTING;
         return true;
+    }
+
+    //########### Gatt connection timeout ##############
+
+    Runnable GattConnectWithTimeout = new Runnable() {
+        @Override
+        public void run() {
+            try{
+                if(gatt != null) {
+                    gatt.disconnect();
+                    gatt.close();
+                }
+                connect(gattDeviceAddressToConnect);
+            }finally {
+                //After 1 seconds call update again.
+                GattConnectWithTimeoutHandler.postDelayed(GattConnectWithTimeout, 1300);
+            }
+        }
+    };
+
+    void startGattConnectingWithTimeout(){
+        program_state = STATE.GATT_CONNECTING;
+        Log.d("testi", "Starting to connect gatt with timeout");
+        GattConnectWithTimeout.run();
+    }
+
+    void stopGattConnectingWithTimeout(){
+        GattConnectWithTimeoutHandler.removeCallbacks(GattConnectWithTimeout);
     }
 
     //####################### UI #######################
