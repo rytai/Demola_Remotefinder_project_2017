@@ -14,13 +14,16 @@ import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.Debug;
 import android.os.Handler;
+import android.support.constraint.ConstraintLayout;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewDebug;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.ImageView;
 import android.widget.ListAdapter;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.lang.reflect.Array;
@@ -64,9 +67,11 @@ public class Paasivu extends Activity {
 
     // ############# GUI ##############
     //Gets populated by bluetoothdevices
-    ListView deviceListView;
+    Spinner deviceListView;
     //Devices name goes in here
     TextView selectedDeviceLabel;
+    //Visual indicator of the signal strength
+    ImageView indicator;
 
     private Handler UIUpdateHandler;
 
@@ -99,6 +104,7 @@ public class Paasivu extends Activity {
 
         deviceListView = findViewById(R.id.deviceList);
         selectedDeviceLabel = findViewById(R.id.selectedDeviceLabel);
+        indicator = findViewById(R.id.indicator);
 
         //Textview at bottom of screen for debugigng purposes
         TextView rssi_msg = (TextView) findViewById(R.id.signalLabel);
@@ -125,6 +131,9 @@ public class Paasivu extends Activity {
                 btAdapter.startDiscovery();
             }
         }
+
+        //Testing indicator scaling
+        scaleIndicator(-50);
 
         initiateDeviceListview();
 
@@ -230,11 +239,12 @@ public class Paasivu extends Activity {
         for (BluetoothDevice bt : btDeviceList) {
             list.add(bt.getName());
         }
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, list);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, list);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         deviceListView.setAdapter(adapter);
-        deviceListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        deviceListView.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 String info = ((TextView) view).getText().toString();
                 for (BluetoothDevice bt : btDeviceList){//pairedDevices) {
                     if (bt.getName().equals(info)) {
@@ -242,6 +252,9 @@ public class Paasivu extends Activity {
                     }
                 }
 
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
             }
         });
     }
@@ -251,7 +264,8 @@ public class Paasivu extends Activity {
         {
             list.add(bt.getName());
         }
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, list);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, list);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         deviceListView.setAdapter(adapter);
     }
 
@@ -439,6 +453,7 @@ public class Paasivu extends Activity {
                     String str_ = "RSSI: "+selectedDevice.getName() +" "+gui_rssi_reading;
                     str_ = str_ + "\nAverage: "+ average;
                     selectedDeviceLabel.setText(str_);
+                    scaleIndicator(average);
 
                 }else if(program_state == STATE.BLUETOOTH_DISCOVERING){
                     selectedDeviceLabel.setText("Discovering bluetooth devices");
@@ -468,6 +483,13 @@ public class Paasivu extends Activity {
     //Obsolete
     void stopUIUpdate(){
         UIUpdateHandler.removeCallbacks(UIUpdate);
+    }
+
+    //Scales the signal indicator according to the rssi reading.
+    public void scaleIndicator(float rssi) {
+        int scale = (int) rssi * (-1) * 10;
+        ConstraintLayout.LayoutParams layoutParams = new ConstraintLayout.LayoutParams(scale, scale);
+        indicator.setLayoutParams(layoutParams);
     }
 
 }
