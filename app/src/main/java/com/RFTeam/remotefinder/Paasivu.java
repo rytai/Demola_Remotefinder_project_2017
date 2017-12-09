@@ -265,6 +265,13 @@ public class Paasivu extends Activity {
         String name_ = btDevice_.getName();
 
         gattDeviceAddressToConnect = btDevice_.getAddress();
+
+        //stopGattConnectingWithTimeout();
+        try {
+            stopGattConnectingWithTimeout();
+        }catch (Exception exception){
+            
+        }
         startGattConnectingWithTimeout();
 
         //Connect gatt to this device
@@ -288,6 +295,9 @@ public class Paasivu extends Activity {
 
             }else if(newState == BluetoothProfile.STATE_DISCONNECTED){
                 Log.d("testi", "onConChange: State disconnected");
+                //stopGattConnectingWithTimeout();
+                gatt.disconnect();
+                gatt.close();
 
                 //Connection failed. Try to reconnect.
                 if (program_state == STATE.GATT_CONNECTING | program_state == STATE.CONNECTION_FAILED_RECONNECTING){
