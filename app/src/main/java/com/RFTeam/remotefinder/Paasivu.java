@@ -377,6 +377,8 @@ public class Paasivu extends Activity {
         program_state = STATE.GATT_CONNECTING;
         gatt_connecting_to_device = address;
 
+        Log.d("testi", "Connect called.");
+
         //Check that we have bluetooth and address field is not null.
         if (btAdapter == null || address == null) {
             Log.w("testi", "BluetoothAdapter not initialized or unspecified address.");
@@ -424,6 +426,7 @@ public class Paasivu extends Activity {
         public void run() {
             try{
                 if(gatt != null) {
+                    Log.d("testi", "Killing gatt connection due to timeout. Retrying.");
                     gatt.disconnect();
                     gatt.close();
                 }
