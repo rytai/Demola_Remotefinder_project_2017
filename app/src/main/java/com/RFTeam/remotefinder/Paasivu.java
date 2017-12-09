@@ -303,15 +303,23 @@ public class Paasivu extends Activity {
             if (newState == BluetoothProfile.STATE_CONNECTED){
                 Log.d("testi", "onConChange: Connected!");
                 program_state = STATE.GATT_CONNECTED;
-                stopGattConnectingWithTimeout();
+                try {
+                    stopGattConnectingWithTimeout();
+                }catch(Exception e){
+
+                }
                 startRSSIReading();
                 //gatt_.discoverServices(); this might(?) cause issues
 
             }else if(newState == BluetoothProfile.STATE_DISCONNECTED){
                 Log.d("testi", "onConChange: State disconnected");
                 //stopGattConnectingWithTimeout();
-                gatt.disconnect();
-                gatt.close();
+                try {
+                    gatt.disconnect();
+                    gatt.close();
+                }finally{
+                    gatt = null;
+                }
 
                 //Connection failed. Try to reconnect.
                 if (program_state == STATE.GATT_CONNECTING | program_state == STATE.CONNECTION_FAILED_RECONNECTING){
