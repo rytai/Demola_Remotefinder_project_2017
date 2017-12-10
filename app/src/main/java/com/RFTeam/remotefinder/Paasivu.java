@@ -89,9 +89,21 @@ public class Paasivu extends Activity {
         stopRSSIReading();
         stopUIUpdate();
         super.onStop();
-        gatt.disconnect();
+        try {
+            gatt.disconnect();
+        }catch (Exception e){
+
+        }
+        try{
         gatt.close();
+        }catch (Exception e){
+
+        }
+        try{
         btAdapter.cancelDiscovery();
+        }catch (Exception e){
+
+        }
 
     }
     @Override
@@ -270,6 +282,7 @@ public class Paasivu extends Activity {
     }
 
     public void Select_Device(BluetoothDevice btDevice_){
+        btAdapter.cancelDiscovery();
         //stopBluetoothDeviceDiscovery();
         program_state = STATE.DEVICE_SELECTED;
 
@@ -441,7 +454,7 @@ public class Paasivu extends Activity {
                 connect(gattDeviceAddressToConnect);
             }finally {
                 //After 1 seconds call update again.
-                GattConnectWithTimeoutHandler.postDelayed(GattConnectWithTimeout, 1300);
+                GattConnectWithTimeoutHandler.postDelayed(GattConnectWithTimeout, 3000);
             }
         }
     };
