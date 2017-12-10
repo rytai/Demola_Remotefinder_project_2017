@@ -86,7 +86,9 @@ public class Paasivu extends Activity {
 
     @Override
     protected void onStop() {
-        stopRSSIReading();
+        try {
+            stopRSSIReading();
+        }catch(Exception e){}
         stopUIUpdate();
         super.onStop();
         try {
