@@ -21,6 +21,7 @@ import android.view.ViewDebug;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.Spinner;
@@ -147,7 +148,7 @@ public class Paasivu extends Activity {
         }
 
         //Testing indicator scaling
-        scaleIndicator(-50);
+        scaleIndicator(-37);
 
         initiateDeviceListview();
 
@@ -422,8 +423,13 @@ public class Paasivu extends Activity {
                 return false;
             }
             */
-            gatt.disconnect();
-            gatt.close();
+            try {
+                gatt.disconnect();
+                gatt.close();
+            }
+            catch (Exception e) {
+
+            }
         }
 
         // There is no previous connection -> Create a new one.
@@ -454,7 +460,11 @@ public class Paasivu extends Activity {
                     gatt.close();
                 }
                 connect(gattDeviceAddressToConnect);
-            }finally {
+            }
+            catch (Exception e) {
+
+            }
+            finally {
                 //After 1 seconds call update again.
                 GattConnectWithTimeoutHandler.postDelayed(GattConnectWithTimeout, 3000);
             }
@@ -523,7 +533,7 @@ public class Paasivu extends Activity {
 
     //Scales the signal indicator according to the rssi reading.
     public void scaleIndicator(float rssi) {
-        int scale = (int) rssi * (-1) * 10;
+        int scale = (int) ((rssi * (-1) - 30) * 10);
         ConstraintLayout.LayoutParams layoutParams = new ConstraintLayout.LayoutParams(scale, scale);
         indicator.setLayoutParams(layoutParams);
     }

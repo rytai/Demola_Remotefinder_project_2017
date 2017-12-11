@@ -4,31 +4,12 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.RFTeam.remotefinder.Paasivu">
-
-    <TextView
-        android:id="@+id/signalLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        android:layout_marginStart="144dp"
-        android:text="Signal strength:"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <TextView
-        android:id="@+id/selectedDeviceLabel"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        android:layout_marginStart="8dp"
-        android:text="Scanning BLE beacons."
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
+    tools:context="com.RFTeam.remotefinder.Paasivu"
+    android:background="#b6d8ed">
 
     <Spinner
         android:id="@+id/deviceList"
-        android:layout_width="368dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
         app:layout_constraintStart_toStartOf="parent"
@@ -36,12 +17,37 @@
 
     <ImageView
         android:id="@+id/indicator"
-        android:layout_width="208dp"
-        android:layout_height="242dp"
-        android:layout_marginStart="88dp"
-        android:layout_marginTop="136dp"
-        android:src="@android:drawable/btn_star_big_on"
+        android:layout_width="200dp"
+        android:layout_height="200dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:src="@drawable/indicator"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.511" />
+
+    <TextView
+        android:id="@+id/selectedDeviceLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:layout_weight="1"
+        android:text="Scanning BLE beacons."
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <TextView
+        android:id="@+id/signalLabel"
+        android:layout_width="300dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="40dp"
+        android:layout_marginStart="144dp"
+        android:layout_weight="1"
+        android:text="Signal strength:"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
 </android.support.constraint.ConstraintLayout>
