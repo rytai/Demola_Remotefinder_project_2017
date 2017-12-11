@@ -536,6 +536,9 @@ public class Paasivu extends Activity {
         int scale = (int) ((rssi * (-1) - 30) * 10);
         ConstraintLayout.LayoutParams layoutParams = new ConstraintLayout.LayoutParams(scale, scale);
         indicator.setLayoutParams(layoutParams);
+        //Center of the screen. Adjust to your device.
+        indicator.setX(360 - scale / 2);
+        indicator.setY(540 - scale / 2);
     }
 
 }
